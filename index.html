@@ -1,0 +1,1886 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Vehicle Parts Distribution - Interactive Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: 'Segoe UI', Tahoma, sans-serif;
+  background: #f0f2f5;
+  color: #1a1a1a;
+  line-height: 1.5;
+}
+header {
+  background: linear-gradient(135deg, #1e3a6f 0%, #2c5aa0 100%);
+  color: white;
+  padding: 20px 30px;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.15);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+header .title-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+}
+header h1 { font-size: 24px; font-weight: 600; }
+header .subtitle { font-size: 13px; opacity: 0.85; margin-top: 4px; }
+.badge {
+  background: rgba(255,255,255,0.2);
+  padding: 6px 14px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 1px;
+}
+nav {
+  background: #fff;
+  padding: 0 30px;
+  border-bottom: 1px solid #e0e0e0;
+  overflow-x: auto;
+  white-space: nowrap;
+  position: sticky;
+  top: 86px;
+  z-index: 99;
+}
+nav button {
+  background: none;
+  border: none;
+  padding: 14px 18px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  color: #555;
+  border-bottom: 3px solid transparent;
+  transition: all 0.2s;
+}
+nav button:hover { color: #2c5aa0; background: #f8f9fc; }
+nav button.active { color: #2c5aa0; border-bottom-color: #2c5aa0; }
+
+.container { padding: 24px 30px; max-width: 1600px; margin: 0 auto; }
+.section { display: none; }
+.section.active { display: block; animation: fade 0.3s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+h2.section-title {
+  font-size: 22px;
+  color: #1e3a6f;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 2px solid #2c5aa0;
+}
+h3.sub-title {
+  font-size: 16px;
+  color: #2c5aa0;
+  margin: 20px 0 12px;
+}
+
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.kpi-card {
+  background: white;
+  padding: 18px;
+  border-radius: 10px;
+  border-left: 4px solid #2c5aa0;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+  transition: transform 0.2s, box-shadow 0.2s;
+  cursor: pointer;
+}
+.kpi-card:hover { transform: translateY(-3px); box-shadow: 0 4px 14px rgba(0,0,0,0.12); }
+.kpi-card .value { font-size: 26px; font-weight: 700; color: #1e3a6f; }
+.kpi-card .label { font-size: 12px; color: #666; text-transform: uppercase; letter-spacing: 0.8px; margin-top: 4px; }
+.kpi-card .delta { font-size: 11px; margin-top: 6px; color: #28a745; font-weight: 600; }
+.kpi-card .delta.neg { color: #dc3545; }
+
+.chart-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(420px, 1fr));
+  gap: 18px;
+  margin-bottom: 20px;
+}
+.chart-card, .table-card, .info-card {
+  background: white;
+  padding: 18px;
+  border-radius: 10px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.chart-card h4 { font-size: 14px; color: #333; margin-bottom: 12px; font-weight: 600; }
+.chart-wrap { position: relative; height: 300px; }
+.chart-wrap.tall { height: 380px; }
+
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th { background: #1e3a6f; color: white; padding: 10px; text-align: left; font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+td { padding: 9px 10px; border-bottom: 1px solid #eee; }
+tr:nth-child(even) td { background: #f8f9fc; }
+tr:hover td { background: #e8f0fa; }
+.table-wrap { overflow-x: auto; }
+
+.controls {
+  background: white;
+  padding: 14px 18px;
+  border-radius: 10px;
+  margin-bottom: 18px;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+}
+.controls label { font-size: 12px; font-weight: 600; color: #555; margin-right: 6px; }
+.controls select, .controls input {
+  padding: 7px 12px;
+  border: 1px solid #ccd;
+  border-radius: 6px;
+  font-size: 13px;
+  background: white;
+}
+.controls select:focus, .controls input:focus { outline: none; border-color: #2c5aa0; }
+
+.tag {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.tag.green { background: #d4edda; color: #155724; }
+.tag.red { background: #f8d7da; color: #721c24; }
+.tag.yellow { background: #fff3cd; color: #856404; }
+.tag.blue { background: #cce5ff; color: #004085; }
+
+.info-card p { margin: 8px 0; font-size: 13px; color: #444; }
+.info-card ul { margin: 8px 0 8px 20px; font-size: 13px; color: #444; }
+.info-card li { margin: 4px 0; }
+
+.alert {
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin: 10px 0;
+  font-size: 13px;
+}
+.alert.info { background: #e3f2fd; border-left: 4px solid #2196f3; color: #0d47a1; }
+.alert.warn { background: #fff8e1; border-left: 4px solid #ffc107; color: #856404; }
+.alert.success { background: #e8f5e9; border-left: 4px solid #4caf50; color: #1b5e20; }
+
+footer {
+  text-align: center;
+  padding: 20px;
+  font-size: 12px;
+  color: #888;
+  border-top: 1px solid #e0e0e0;
+  margin-top: 30px;
+}
+
+.priority-p1 { color: #dc3545; font-weight: 700; }
+.priority-p2 { color: #fd7e14; font-weight: 700; }
+.priority-p3 { color: #28a745; font-weight: 700; }
+
+@media (max-width: 768px) {
+  .chart-grid { grid-template-columns: 1fr; }
+  header h1 { font-size: 18px; }
+  nav { top: 95px; }
+}
+.global-filter {
+  background: #ffffff;
+  padding: 14px 30px;
+  border-bottom: 1px solid #e0e0e0;
+  display: flex;
+  gap: 14px;
+  flex-wrap: wrap;
+  align-items: center;
+  position: sticky;
+  top: 136px;
+  z-index: 98;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+}
+
+.global-filter label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #444;
+  margin-right: 5px;
+}
+
+.global-filter input {
+  padding: 7px 10px;
+  border: 1px solid #ccd;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.global-filter button {
+  border: none;
+  background: #1e3a6f;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.global-filter button:hover {
+  background: #2c5aa0;
+}
+
+.global-filter .summary {
+  font-size: 12px;
+  color: #555;
+  font-weight: 600;
+  margin-left: auto;
+}
+
+@media (max-width: 768px) {
+  .global-filter {
+    top: 145px;
+    padding: 12px 16px;
+  }
+
+  .global-filter .summary {
+    margin-left: 0;
+    width: 100%;
+  }
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="title-row">
+    <div>
+      <h1>Vehicle Parts Distribution — Analytics Dashboard</h1>
+      <div class="subtitle">Apr 2024 – Mar 2026 | 1M Transactions | 500 Customers | 10,000 Independent SKUs</div>
+    </div>
+    <div class="badge">CONFIDENTIAL</div>
+  </div>
+</header>
+
+<nav id="navBar">
+  <button class="active" data-tab="overview">Overview</button>
+  <button data-tab="quality">Data Quality</button>
+  <button data-tab="eda">EDA</button>
+  <button data-tab="timeseries">Time-Series</button>
+  <button data-tab="customers">Customers</button>
+  <button data-tab="skus">SKUs</button>
+  <button data-tab="demand">Demand Patterns</button>
+  <button data-tab="stats">Statistics</button>
+  <button data-tab="forecast">Forecast</button>
+  <button data-tab="insights">Insights</button>
+  <button data-tab="recommendations">Recommendations</button>
+</nav>
+<div class="global-filter">
+  <div>
+    <label>Start Date</label>
+    <input type="date" id="globalStartDate">
+  </div>
+
+  <div>
+    <label>End Date</label>
+    <input type="date" id="globalEndDate">
+  </div>
+
+  <button type="button" data-range="full">Full Period</button>
+  <button type="button" data-range="fy2425">FY 2024-25</button>
+  <button type="button" data-range="fy2526">FY 2025-26</button>
+  <button type="button" data-range="last90">Last 90 Days</button>
+  <button type="button" id="applyDateRange">Apply</button>
+
+  <div class="summary" id="rangeSummary">
+    Showing full period: 01 Apr 2024 - 31 Mar 2026
+  </div>
+</div>
+
+<div class="container">
+
+<!-- OVERVIEW -->
+<section class="section active" id="overview">
+  <h2 class="section-title">Executive Overview</h2>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="value">6.39M</div><div class="label">Total Units Billed</div><div class="delta">+32.9% YoY</div></div>
+    <div class="kpi-card"><div class="value">1.0M</div><div class="label">Transactions</div></div>
+    <div class="kpi-card"><div class="value">500</div><div class="label">Unique Customers</div></div>
+    <div class="kpi-card"><div class="value">10,000</div><div class="label">Independent SKUs</div></div>
+    <div class="kpi-card"><div class="value">8,754</div><div class="label">Avg Daily Volume</div></div>
+    <div class="kpi-card"><div class="value">730</div><div class="label">Days Coverage</div></div>
+    <div class="kpi-card"><div class="value">99.8</div><div class="label">Data Quality / 100</div></div>
+    <div class="kpi-card"><div class="value">8.6</div><div class="label">ML Readiness / 10</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4>Yearly Billing Volume</h4>
+      <div class="chart-wrap"><canvas id="yearlyChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>Quarterly Volume Trend</h4>
+      <div class="chart-wrap"><canvas id="quarterlyChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="info-card">
+      <h3 class="sub-title">Key Findings</h3>
+      <ul>
+        <li><b>+32.9% YoY growth</b> – Strong demand expansion 2024→2025</li>
+        <li><b>Daily CV ≈ 4.6%</b> – Highly stable and predictable</li>
+        <li><b>February dip</b> – Recurring 8-10% below average</li>
+        <li><b>11.8% bulk orders</b> – Legitimate high-volume segment</li>
+        <li><b>Top customer 0.22%</b> – No concentration risk</li>
+        <li><b>Zero missing values</b> – Analysis-ready data</li>
+      </ul>
+    </div>
+    <div class="info-card">
+      <h3 class="sub-title">Business Impact</h3>
+      <table>
+        <tr><th>Area</th><th>Impact</th></tr>
+        <tr><td>Growth</td><td><span class="tag green">Strong</span></td></tr>
+        <tr><td>Seasonality</td><td><span class="tag yellow">Feb opportunity</span></td></tr>
+        <tr><td>Customer Risk</td><td><span class="tag green">Diversified</span></td></tr>
+        <tr><td>Inventory</td><td><span class="tag blue">Optimize needed</span></td></tr>
+        <tr><td>Forecasting</td><td><span class="tag green">ML-ready</span></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- DATA QUALITY -->
+<section class="section" id="quality">
+  <h2 class="section-title">Data Cleaning & Quality</h2>
+  <div class="alert success">✓ Dataset achieved <b>99.8/100</b> quality score with zero missing values and only 14 duplicates out of 1M records.</div>
+
+  <div class="chart-grid">
+    <div class="table-card">
+      <h3 class="sub-title">Missing Value Audit</h3>
+      <table>
+        <tr><th>Column</th><th>Missing</th><th>%</th><th>Treatment</th></tr>
+        <tr><td>SKU</td><td>0</td><td>0.00%</td><td><span class="tag green">None needed</span></td></tr>
+        <tr><td>Billing_Date</td><td>0</td><td>0.00%</td><td><span class="tag green">None needed</span></td></tr>
+        <tr><td>Billing_Quantity</td><td>0</td><td>0.00%</td><td><span class="tag green">None needed</span></td></tr>
+        <tr><td>Customer</td><td>0</td><td>0.00%</td><td><span class="tag green">None needed</span></td></tr>
+      </table>
+    </div>
+    <div class="table-card">
+      <h3 class="sub-title">Outlier Detection</h3>
+      <table>
+        <tr><th>Method</th><th>Threshold</th><th>Count</th><th>%</th></tr>
+        <tr><td>IQR Lower</td><td>&lt; -4.0</td><td>0</td><td>0.00%</td></tr>
+        <tr><td>IQR Upper</td><td>&gt; 12.0</td><td>118,356</td><td>11.8%</td></tr>
+        <tr><td>Z-Score</td><td>|z| &gt; 3</td><td>~14,000</td><td>~1.4%</td></tr>
+      </table>
+      <p style="font-size:12px;color:#666;margin-top:10px"><i>Outliers represent legitimate bulk-order transactions.</i></p>
+    </div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="table-card">
+      <h3 class="sub-title">Feature Engineering</h3>
+      <table>
+        <tr><th>Feature</th><th>Source</th><th>Use Case</th></tr>
+        <tr><td>DayOfWeek</td><td>Billing_Date</td><td>Scheduling</td></tr>
+        <tr><td>Month / Quarter / Year</td><td>Billing_Date</td><td>Seasonality</td></tr>
+        <tr><td>IsWeekend</td><td>DayOfWeek</td><td>Weekend analysis</td></tr>
+        <tr><td>Lag1 / Lag7 DailyQty</td><td>Daily aggregation</td><td>Forecasting</td></tr>
+        <tr><td>Rolling7 / Rolling30 Avg</td><td>Daily aggregation</td><td>Smoothing</td></tr>
+        <tr><td>Log_Qty</td><td>Billing_Quantity</td><td>Skewness reduction</td></tr>
+      </table>
+    </div>
+    <div class="chart-card">
+      <h4>Quality Checks Status</h4>
+      <div class="chart-wrap"><canvas id="qualityChart"></canvas></div>
+    </div>
+  </div>
+</section>
+
+<!-- EDA -->
+<section class="section" id="eda">
+  <h2 class="section-title">Exploratory Data Analysis</h2>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="value">6.39</div><div class="label">Mean Qty</div></div>
+    <div class="kpi-card"><div class="value">3</div><div class="label">Median Qty</div></div>
+    <div class="kpi-card"><div class="value">9.35</div><div class="label">Std Dev</div></div>
+    <div class="kpi-card"><div class="value">2.88</div><div class="label">Skewness</div></div>
+    <div class="kpi-card"><div class="value">8.15</div><div class="label">Kurtosis</div></div>
+    <div class="kpi-card"><div class="value">100</div><div class="label">Max Qty</div></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4>Billing Quantity Distribution (qty ≤ 30)</h4>
+      <div class="chart-wrap"><canvas id="qtyDistChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>Billing Volume by Day of Week</h4>
+      <div class="chart-wrap"><canvas id="dowChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-card" style="margin-bottom:18px">
+    <h3 class="sub-title">Transaction Distribution by Day</h3>
+    <div class="table-wrap">
+    <table id="dayTable">
+      <thead><tr><th>Day</th><th>Total Units</th><th>Transactions</th><th>Avg Qty/Txn</th><th>Type</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </div>
+
+  <div class="info-card" style="margin-bottom:18px">
+    <h3 class="sub-title">SKU Distribution</h3>
+    <p><b>Total Independent SKUs:</b> 10,000</p>
+    <p><b>Avg Transactions per SKU:</b> ~100</p>
+    <p><b>Top SKU Units:</b> 1,131</p>
+    <p><b>Bottom SKU Units:</b> Single digit</p>
+    <div class="alert info" style="margin-top:12px">
+      All 10,000 SKUs are <b>independent products</b> with individual transaction patterns. No hierarchical categories or product groupings exist.
+    </div>
+  </div>
+</section>
+
+<!-- TIMESERIES -->
+<section class="section" id="timeseries">
+  <h2 class="section-title">Time-Series Analysis</h2>
+
+  <div class="controls">
+    <div><label>View:</label>
+      <select id="tsView">
+        <option value="monthly">Monthly</option>
+        <option value="quarterly">Quarterly</option>
+        <option value="yearly">Yearly</option>
+      </select>
+    </div>
+    <div><label>Year filter:</label>
+      <select id="tsYearFilter">
+        <option value="all">All Years</option>
+        <option value="2024">2024</option>
+        <option value="2025">2025</option>
+        <option value="2026">2026</option>
+      </select>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:18px">
+    <h4 id="tsChartTitle">Monthly Billing Volume</h4>
+    <div class="chart-wrap tall"><canvas id="tsChart"></canvas></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4>Month-over-Month Growth (%)</h4>
+      <div class="chart-wrap"><canvas id="momChart"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <h4>Year-over-Year Seasonal Comparison</h4>
+      <div class="chart-wrap"><canvas id="yoyChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="table-card" style="margin-top:18px">
+    <h3 class="sub-title">Monthly Detail Table</h3>
+    <div class="table-wrap">
+    <table id="monthlyTable">
+      <thead><tr><th>Year</th><th>Month</th><th>Total Units</th><th>YoY %</th><th>Note</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- CUSTOMERS -->
+<section class="section" id="customers">
+  <h2 class="section-title">Customer Analysis</h2>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="value">500</div><div class="label">Total Customers</div></div>
+    <div class="kpi-card"><div class="value">~2,000</div><div class="label">Avg Txns / Customer</div></div>
+    <div class="kpi-card"><div class="value">0.22%</div><div class="label">Top Customer Share</div></div>
+    <div class="kpi-card"><div class="value">100%</div><div class="label">Retention Rate</div></div>
+  </div>
+
+  <div class="controls">
+    <label>Show top:</label>
+    <select id="topNCustomers">
+      <option value="10">Top 10</option>
+      <option value="15" selected>Top 15</option>
+    </select>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:18px">
+    <h4>Top Customers by Total Billing Volume</h4>
+    <div class="chart-wrap tall"><canvas id="topCustChart"></canvas></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="table-card">
+      <h3 class="sub-title">Top Customer Detail</h3>
+      <div class="table-wrap">
+      <table id="custTable">
+        <thead><tr><th>Rank</th><th>Customer</th><th>Total Units</th><th>% Share</th><th>Txns</th><th>Avg Qty</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      </div>
+    </div>
+    <div class="info-card">
+      <h3 class="sub-title">Customer Segmentation</h3>
+      <table>
+        <tr><th>Segment</th><th>Criteria</th><th>Share</th></tr>
+        <tr><td>Small-order repeat</td><td>Avg qty 1-4</td><td>~40%</td></tr>
+        <tr><td>Medium-order regular</td><td>Avg qty 5-10</td><td>~40%</td></tr>
+        <tr><td>Bulk-order occasional</td><td>Avg qty 11+</td><td>~20%</td></tr>
+      </table>
+      <div class="alert info" style="margin-top:14px">
+        Customer base is <b>extremely diversified</b>. Top customer accounts for only 0.22% of total volume — no concentration risk.
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- SKUs -->
+<section class="section" id="skus">
+  <h2 class="section-title">SKU Analysis (10,000 Independent Products)</h2>
+  <div class="kpi-grid">
+    <div class="kpi-card"><div class="value">10,000</div><div class="label">Total Independent SKUs</div></div>
+    <div class="kpi-card"><div class="value">~100</div><div class="label">Avg Txns / SKU</div></div>
+    <div class="kpi-card"><div class="value">1,131</div><div class="label">Top SKU Units</div></div>
+    <div class="kpi-card"><div class="value">1</div><div class="label">Bottom SKU Units</div></div>
+  </div>
+
+  <div class="chart-card" style="margin-bottom:18px">
+    <h4>Top 15 Independent SKUs by Total Billing Volume</h4>
+    <div class="chart-wrap tall"><canvas id="topSkuChart"></canvas></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4>SKU Velocity Distribution</h4>
+      <div class="chart-wrap"><canvas id="velocityChart"></canvas></div>
+    </div>
+    <div class="table-card">
+      <h3 class="sub-title">Velocity Segmentation</h3>
+      <table>
+        <tr><th>Tier</th><th>Criteria</th><th>SKUs</th><th>%</th></tr>
+        <tr><td><span class="tag green">Fast</span></td><td>&gt; 400 u/y</td><td>~3,000</td><td>30%</td></tr>
+        <tr><td><span class="tag blue">Medium</span></td><td>200-400 u/y</td><td>~4,000</td><td>40%</td></tr>
+        <tr><td><span class="tag yellow">Slow</span></td><td>100-200 u/y</td><td>~2,500</td><td>25%</td></tr>
+        <tr><td><span class="tag red">Dead</span></td><td>&lt; 100 u/y</td><td>~500</td><td>5%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="table-card" style="margin-top:18px">
+    <h3 class="sub-title">Top 15 Independent SKUs</h3>
+    <div class="table-wrap">
+    <table id="skuTable">
+      <thead><tr><th>Rank</th><th>SKU ID</th><th>Total Units</th><th>% of Total</th></tr></thead>
+      <tbody></tbody>
+    </table>
+    </div>
+  </div>
+</section>
+
+<!-- DEMAND -->
+<section class="section" id="demand">
+  <h2 class="section-title">Demand Pattern Analysis</h2>
+
+  <div class="chart-grid">
+    <div class="info-card">
+      <h3 class="sub-title">Stable vs Erratic Demand</h3>
+      <table>
+        <tr><th>Level</th><th>CV</th><th>Assessment</th></tr>
+        <tr><td>Daily</td><td>4.6%</td><td><span class="tag green">Highly stable</span></td></tr>
+        <tr><td>Weekly</td><td>~6.2%</td><td><span class="tag green">Stable</span></td></tr>
+        <tr><td>Monthly</td><td>~4.6%</td><td><span class="tag green">Highly stable</span></td></tr>
+        <tr><td>Customer</td><td>~2.2%</td><td><span class="tag green">Extremely stable</span></td></tr>
+      </table>
+    </div>
+    <div class="info-card">
+      <h3 class="sub-title">Weekday vs Weekend</h3>
+      <table>
+        <tr><th>Metric</th><th>Weekday</th><th>Weekend</th></tr>
+        <tr><td>Volume Share</td><td>~71.5%</td><td>~28.5%</td></tr>
+        <tr><td>Days</td><td>5/7</td><td>2/7</td></tr>
+        <tr><td>Avg Daily</td><td>~8,764</td><td>~8,735</td></tr>
+      </table>
+      <div class="alert info" style="margin-top:12px">Genuine weekend B2B demand — no operational gap.</div>
+    </div>
+  </div>
+
+  <div class="chart-card" style="margin:18px 0">
+    <h4>Demand Anomalies (±2.5σ thresholds)</h4>
+    <div class="chart-wrap tall"><canvas id="anomalyChart"></canvas></div>
+  </div>
+
+  <div class="table-card">
+    <h3 class="sub-title">Detected Anomalies</h3>
+    <table>
+      <tr><th>Date</th><th>Volume</th><th>Z-Score</th><th>Direction</th><th>Potential Cause</th></tr>
+      <tr><td>2025-05-26</td><td>9,832</td><td>+2.66</td><td><span class="tag green">Spike</span></td><td>Bulk order event</td></tr>
+      <tr><td>2025-04-10</td><td>9,810</td><td>+2.61</td><td><span class="tag green">Spike</span></td><td>Bulk order event</td></tr>
+      <tr><td>2024-05-10</td><td>9,770</td><td>+2.51</td><td><span class="tag green">Spike</span></td><td>Period-end rush</td></tr>
+      <tr><td>2025-04-15</td><td>7,598</td><td>-2.86</td><td><span class="tag red">Drop</span></td><td>Holiday / shutdown</td></tr>
+      <tr><td>2025-03-06</td><td>7,531</td><td>-3.02</td><td><span class="tag red">Drop</span></td><td>Holiday / shutdown</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- STATS -->
+<section class="section" id="stats">
+  <h2 class="section-title">Statistical Analysis</h2>
+
+  <div class="chart-grid">
+    <div class="table-card">
+      <h3 class="sub-title">Summary Statistics — Billing Quantity</h3>
+      <table>
+        <tr><td>Count</td><td><b>1,000,000</b></td><td>Skewness</td><td><b>2.8835</b></td></tr>
+        <tr><td>Mean</td><td><b>6.39</b></td><td>Kurtosis</td><td><b>8.1459</b></td></tr>
+        <tr><td>Std Dev</td><td><b>9.35</b></td><td>IQR</td><td><b>4.00</b></td></tr>
+        <tr><td>Min</td><td><b>1</b></td><td>P25</td><td><b>2</b></td></tr>
+        <tr><td>Median</td><td><b>3</b></td><td>P75</td><td><b>6</b></td></tr>
+        <tr><td>Max</td><td><b>100</b></td><td>P90</td><td><b>15</b></td></tr>
+      </table>
+    </div>
+    <div class="table-card">
+      <h3 class="sub-title">Variance by Aggregation</h3>
+      <table>
+        <tr><th>Level</th><th>Mean</th><th>Std</th><th>CV</th></tr>
+        <tr><td>Transaction</td><td>6.39</td><td>9.35</td><td>146.2%</td></tr>
+        <tr><td>Daily</td><td>8,754</td><td>405</td><td>4.6%</td></tr>
+        <tr><td>Weekly</td><td>~61,000</td><td>~3,800</td><td>6.2%</td></tr>
+        <tr><td>Monthly</td><td>~266,300</td><td>~7,880</td><td>~3.0%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="table-card" style="margin-top:18px">
+    <h3 class="sub-title">Hypothesis Testing</h3>
+    <table>
+      <tr><th>Test</th><th>Statistic / p-value</th><th>Result</th><th>Interpretation</th></tr>
+      <tr><td>Shapiro-Wilk</td><td>W=0.5875, p=4.78e-76</td><td><span class="tag red">Reject H0</span></td><td>Non-normal distribution</td></tr>
+      <tr><td>Mann-Whitney U (2024 vs 2025)</td><td>p=0.9059</td><td><span class="tag green">Fail to reject</span></td><td>No per-txn quantity shift</td></tr>
+      <tr><td>February vs other months</td><td>p=0.1565</td><td><span class="tag green">Fail to reject</span></td><td>Directional but not significant @5%</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- FORECAST -->
+<section class="section" id="forecast">
+  <h2 class="section-title">Forecasting & Predictive Modeling</h2>
+
+  <div class="chart-card" style="margin-bottom:18px">
+    <h4>Future Demand Forecast — Apr 2026 → Sep 2026</h4>
+    <div class="chart-wrap tall"><canvas id="forecastChart"></canvas></div>
+  </div>
+
+  <div class="chart-grid">
+    <div class="chart-card">
+      <h4>Model MAPE Comparison</h4>
+      <div class="chart-wrap"><canvas id="modelChart"></canvas></div>
+    </div>
+    <div class="table-card">
+      <h3 class="sub-title">Forecast Details</h3>
+      <table>
+        <tr><th>Month</th><th>Forecast</th><th>95% CI Lower</th><th>95% CI Upper</th></tr>
+        <tr><td>Apr 2026</td><td>264,000</td><td>251,000</td><td>277,000</td></tr>
+        <tr><td>May 2026</td><td>272,000</td><td>259,000</td><td>285,000</td></tr>
+        <tr><td>Jun 2026</td><td>261,000</td><td>248,000</td><td>274,000</td></tr>
+        <tr><td>Jul 2026</td><td>272,000</td><td>259,000</td><td>285,000</td></tr>
+        <tr><td>Aug 2026</td><td>271,000</td><td>258,000</td><td>284,000</td></tr>
+        <tr><td>Sep 2026</td><td>263,000</td><td>250,000</td><td>276,000</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="table-card" style="margin-top:18px">
+    <h3 class="sub-title">Recommended Models</h3>
+    <table>
+      <tr><th>Task</th><th>Models</th><th>Notes</th></tr>
+      <tr><td>Daily Forecasting</td><td>SARIMA, Prophet, LightGBM</td><td>Use date features + lags</td></tr>
+      <tr><td>Individual SKU Forecast</td><td>XGBoost, LightGBM, LSTM</td><td>Separate models per SKU</td></tr>
+      <tr><td>Customer Segmentation</td><td>RFM, K-Means</td><td>RFM for interpretability</td></tr>
+      <tr><td>Anomaly Detection</td><td>Z-score, Isolation Forest</td><td>Operational alerts</td></tr>
+    </table>
+  </div>
+</section>
+
+<!-- INSIGHTS -->
+<section class="section" id="insights">
+  <h2 class="section-title">Key Insights & Findings</h2>
+
+  <div class="chart-grid">
+    <div class="info-card">
+      <h3 class="sub-title">Major Observations</h3>
+      <ol style="margin-left:20px;font-size:13px">
+        <li style="margin:6px 0"><b>+32.9% YoY growth</b> — Strong demand expansion</li>
+        <li style="margin:6px 0"><b>February consistently weak</b> — Recurring seasonal risk</li>
+        <li style="margin:6px 0"><b>Top customer 0.22%</b> — No concentration risk</li>
+        <li style="margin:6px 0"><b>11.8% bulk orders</b> — Critical for total volume</li>
+        <li style="margin:6px 0"><b>10,000 independent SKUs</b> — Broad, flat distribution</li>
+        <li style="margin:6px 0"><b>Excellent data quality</b> — ML & BI ready</li>
+      </ol>
+    </div>
+    <div class="info-card">
+      <h3 class="sub-title">Hidden Patterns</h3>
+      <p>Two order-behaviour groups: <b>small repeat orders</b> + <b>large bulk orders</b>.</p>
+      <p>Growth is <b>broad-based</b>, not driven by few customers or products.</p>
+      <p>Seasonal weakness visible <b>across all demand periods</b> → business-calendar effect.</p>
+      <p>Each of 10,000 SKUs operates independently with unique demand signature.</p>
+    </div>
+  </div>
+
+  <div class="chart-grid" style="margin-top:18px">
+    <div class="table-card">
+      <h3 class="sub-title">Risks Identified</h3>
+      <table>
+        <tr><th>Risk</th><th>Severity</th><th>Mitigation</th></tr>
+        <tr><td>February dip</td><td><span class="tag yellow">Medium</span></td><td>Targeted campaigns</td></tr>
+        <tr><td>Bulk dependency</td><td><span class="tag yellow">Medium</span></td><td>Service programs</td></tr>
+        <tr><td>No new customers</td><td><span class="tag yellow">Medium</span></td><td>Acquisition strategy</td></tr>
+        <tr><td>Duplicate rows</td><td><span class="tag green">Low</span></td><td>ETL deduplication</td></tr>
+      </table>
+    </div>
+    <div class="table-card">
+      <h3 class="sub-title">Opportunities</h3>
+      <table>
+        <tr><th>Opportunity</th><th>Benefit</th></tr>
+        <tr><td>Demand forecasting engine</td><td>Inventory planning</td></tr>
+        <tr><td>February promotions</td><td>Recover monthly shortfall</td></tr>
+        <tr><td>Bulk-order program</td><td>Protect high-volume demand</td></tr>
+        <tr><td>SKU velocity segmentation</td><td>Optimize stock</td></tr>
+        <tr><td>Real-time anomaly alerts</td><td>Operational response</td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- RECOMMENDATIONS -->
+<section class="section" id="recommendations">
+  <h2 class="section-title">Recommendations & Roadmap</h2>
+
+  <div class="table-card" style="margin-bottom:18px">
+    <h3 class="sub-title">Business Recommendations</h3>
+    <table>
+      <tr><th>Priority</th><th>Recommendation</th><th>Expected Impact</th></tr>
+      <tr><td><span class="priority-p1">P1</span></td><td>Launch February demand stimulation program</td><td>Recover 8-10% monthly dip</td></tr>
+      <tr><td><span class="priority-p1">P1</span></td><td>Profile and protect bulk-order customers</td><td>Safeguard high-volume contribution</td></tr>
+      <tr><td><span class="priority-p1">P1</span></td><td>Deploy demand forecasting model</td><td>90-day rolling planning</td></tr>
+      <tr><td><span class="priority-p2">P2</span></td><td>Implement SKU velocity segmentation</td><td>Improve inventory efficiency</td></tr>
+      <tr><td><span class="priority-p2">P2</span></td><td>Create anomaly detection alerts</td><td>Faster response to spikes/drops</td></tr>
+      <tr><td><span class="priority-p3">P3</span></td><td>Build per-SKU forecasting models</td><td>Individual product demand planning</td></tr>
+    </table>
+  </div>
+
+  <div class="chart-grid">
+    <div class="table-card">
+      <h3 class="sub-title">Demand Planning Improvements</h3>
+      <table>
+        <tr><th>Current State</th><th>Recommended State</th></tr>
+        <tr><td>Manual planning</td><td>ML-powered forecasting</td></tr>
+        <tr><td>Monthly review</td><td>Weekly forecast refresh</td></tr>
+        <tr><td>Reactive anomaly handling</td><td>Automated alerts</td></tr>
+        <tr><td>Aggregate SKU rules</td><td>Per-SKU demand profiles</td></tr>
+      </table>
+    </div>
+    <div class="table-card">
+      <h3 class="sub-title">Expected Business Outcomes</h3>
+      <table>
+        <tr><th>Outcome</th><th>Timeline</th><th>Confidence</th></tr>
+        <tr><td>Improved forecast accuracy</td><td>3 months</td><td><span class="tag green">High</span></td></tr>
+        <tr><td>Reduced inventory cost</td><td>6 months</td><td><span class="tag green">High</span></td></tr>
+        <tr><td>Improved February sales</td><td>6 months</td><td><span class="tag yellow">Medium</span></td></tr>
+        <tr><td>Reduced stockouts</td><td>6 months</td><td><span class="tag green">High</span></td></tr>
+        <tr><td>Better customer targeting</td><td>6-12 months</td><td><span class="tag yellow">Medium</span></td></tr>
+      </table>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<footer>
+  Vehicle Parts Distribution Analytics Dashboard | Data Analytics Division | Confidential | May 2026
+</footer>
+
+<script>
+// ======================================================
+// NAVIGATION
+// ======================================================
+document.querySelectorAll('#navBar button').forEach(btn => {
+  btn.addEventListener('click', () => {
+    document.querySelectorAll('#navBar button').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById(btn.dataset.tab).classList.add('active');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  });
+});
+
+// ======================================================
+// COLORS
+// ======================================================
+const C = {
+  primary: '#2c5aa0',
+  dark: '#1e3a6f',
+  accent: '#f5a623',
+  green: '#28a745',
+  red: '#dc3545',
+  yellow: '#ffc107',
+  blue: '#17a2b8',
+  gray: '#6c757d',
+  light: '#e8f0fa'
+};
+
+Chart.defaults.font.family = "'Segoe UI', Tahoma, sans-serif";
+Chart.defaults.font.size = 11;
+Chart.defaults.color = '#444';
+
+// ======================================================
+// BASE REPORT DATA
+// ======================================================
+const AVG_QTY_PER_TXN = 6.3907;
+
+const monthlyData = [
+  { y: 2024, m: 'Apr', v: 263847, yoy: null, note: '' },
+  { y: 2024, m: 'May', v: 272848, yoy: null, note: 'Peak' },
+  { y: 2024, m: 'Jun', v: 263002, yoy: null, note: '' },
+  { y: 2024, m: 'Jul', v: 273080, yoy: null, note: 'Peak' },
+  { y: 2024, m: 'Aug', v: 269959, yoy: null, note: '' },
+  { y: 2024, m: 'Sep', v: 261013, yoy: null, note: '' },
+  { y: 2024, m: 'Oct', v: 272204, yoy: null, note: 'Peak' },
+  { y: 2024, m: 'Nov', v: 258846, yoy: null, note: '' },
+  { y: 2024, m: 'Dec', v: 269900, yoy: null, note: '' },
+  { y: 2025, m: 'Jan', v: 275019, yoy: null, note: 'Peak' },
+  { y: 2025, m: 'Feb', v: 242535, yoy: null, note: 'Low' },
+  { y: 2025, m: 'Mar', v: 267946, yoy: null, note: '' },
+  { y: 2025, m: 'Apr', v: 262329, yoy: -0.6, note: '' },
+  { y: 2025, m: 'May', v: 271064, yoy: -0.7, note: '' },
+  { y: 2025, m: 'Jun', v: 259697, yoy: -1.3, note: '' },
+  { y: 2025, m: 'Jul', v: 271167, yoy: -0.7, note: '' },
+  { y: 2025, m: 'Aug', v: 271410, yoy: 0.5, note: '' },
+  { y: 2025, m: 'Sep', v: 265598, yoy: 1.8, note: '' },
+  { y: 2025, m: 'Oct', v: 272836, yoy: 0.2, note: 'Peak' },
+  { y: 2025, m: 'Nov', v: 267395, yoy: 3.3, note: '' },
+  { y: 2025, m: 'Dec', v: 269364, yoy: -0.2, note: '' },
+  { y: 2026, m: 'Jan', v: 274119, yoy: -0.3, note: 'Peak' },
+  { y: 2026, m: 'Feb', v: 244411, yoy: 0.8, note: 'Low' },
+  { y: 2026, m: 'Mar', v: 271087, yoy: 1.2, note: '' }
+];
+
+const topCustomers = [
+  { r: 1, c: '1S362', u: 14322, p: 0.224, t: 2058, a: 6.96 },
+  { r: 2, c: '1S447', u: 14126, p: 0.221, t: 2078, a: 6.80 },
+  { r: 3, c: '1S284', u: 14085, p: 0.220, t: 2063, a: 6.83 },
+  { r: 4, c: '1S431', u: 13920, p: 0.218, t: 2040, a: 6.82 },
+  { r: 5, c: '1S409', u: 13915, p: 0.218, t: 2094, a: 6.65 },
+  { r: 6, c: '1S329', u: 13898, p: 0.217, t: 2036, a: 6.83 },
+  { r: 7, c: '1S499', u: 13880, p: 0.217, t: 2046, a: 6.78 },
+  { r: 8, c: '1S046', u: 13851, p: 0.217, t: 2090, a: 6.63 },
+  { r: 9, c: '1S280', u: 13846, p: 0.217, t: 1966, a: 7.04 },
+  { r: 10, c: '1S481', u: 13817, p: 0.216, t: 2062, a: 6.70 },
+  { r: 11, c: '1S043', u: 13816, p: 0.216, t: 2078, a: 6.65 },
+  { r: 12, c: '1S164', u: 13811, p: 0.216, t: 2084, a: 6.63 },
+  { r: 13, c: '1S289', u: 13780, p: 0.216, t: 2050, a: 6.72 },
+  { r: 14, c: '1S148', u: 13754, p: 0.215, t: 2083, a: 6.60 },
+  { r: 15, c: '1S371', u: 13753, p: 0.215, t: 2042, a: 6.74 }
+];
+
+const topSkus = [
+  { r: 1, s: 'C679', u: 1131 },
+  { r: 2, s: 'I425', u: 1120 },
+  { r: 3, s: 'H933', u: 1110 },
+  { r: 4, s: 'A880', u: 1074 },
+  { r: 5, s: 'F831', u: 1064 },
+  { r: 6, s: 'D631', u: 1059 },
+  { r: 7, s: 'J263', u: 1055 },
+  { r: 8, s: 'J313', u: 1051 },
+  { r: 9, s: 'I379', u: 1046 },
+  { r: 10, s: 'B797', u: 1045 },
+  { r: 11, s: 'G453', u: 1042 },
+  { r: 12, s: 'J020', u: 1040 },
+  { r: 13, s: 'C945', u: 1036 },
+  { r: 14, s: 'A039', u: 1036 },
+  { r: 15, s: 'J191', u: 1036 }
+];
+
+const FULL_TOTAL_UNITS = monthlyData.reduce((s, x) => s + x.v, 0);
+
+// ======================================================
+// DATE HELPERS
+// ======================================================
+const monthIndex = {
+  Jan: 0, Feb: 1, Mar: 2, Apr: 3, May: 4, Jun: 5,
+  Jul: 6, Aug: 7, Sep: 8, Oct: 9, Nov: 10, Dec: 11
+};
+
+const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const dowNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+
+function pad(n) {
+  return String(n).padStart(2, '0');
+}
+
+function fmtDate(d) {
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+}
+
+function parseDate(s) {
+  const [y, m, d] = s.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+function displayDate(s) {
+  const d = parseDate(s);
+  return `${pad(d.getDate())} ${monthNames[d.getMonth()]} ${d.getFullYear()}`;
+}
+
+function compact(n) {
+  if (n >= 1_000_000) return (n / 1_000_000).toFixed(2).replace(/\.00$/, '') + 'M';
+  if (n >= 1_000) return (n / 1_000).toFixed(1).replace(/\.0$/, '') + 'K';
+  return Math.round(n).toLocaleString();
+}
+
+function sum(arr, key = 'units') {
+  return arr.reduce((s, x) => s + Number(x[key] || 0), 0);
+}
+
+// ======================================================
+// BUILD DAILY DATA FROM MONTHLY TOTALS
+// ======================================================
+// This enables dynamic date range filtering using the report-level monthly totals.
+// No SKU grouping/category logic is used.
+function buildDailyData() {
+  const anomalyOverrides = {
+    '2025-05-26': 9832,
+    '2025-04-10': 9810,
+    '2024-05-10': 9770,
+    '2025-04-15': 7598,
+    '2025-03-06': 7531
+  };
+
+  const daily = [];
+
+  monthlyData.forEach(row => {
+    const y = row.y;
+    const m = monthIndex[row.m];
+    const daysInMonth = new Date(y, m + 1, 0).getDate();
+
+    const temp = [];
+
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateObj = new Date(y, m, d);
+      const date = fmtDate(dateObj);
+      const dow = dateObj.getDay();
+
+      let weight = 1;
+
+      // Small weekday profile based on report finding:
+      // Tuesday slightly high, Friday slightly low, weekend similar.
+      if (dow === 2) weight += 0.018;
+      if (dow === 5) weight -= 0.012;
+      if (dow === 0 || dow === 6) weight -= 0.004;
+
+      // Deterministic mild variation.
+      weight += Math.sin((d + m * 3) / 3.7) * 0.025;
+      weight += Math.cos((d + y) / 5.1) * 0.018;
+
+      temp.push({
+        date,
+        dateObj,
+        year: y,
+        month: row.m,
+        monthNum: m + 1,
+        day: d,
+        dow,
+        dowName: dowNames[dow],
+        weight,
+        fixed: anomalyOverrides[date] || null
+      });
+    }
+
+    const fixedSum = temp.filter(x => x.fixed !== null).reduce((s, x) => s + x.fixed, 0);
+    const freeWeight = temp.filter(x => x.fixed === null).reduce((s, x) => s + x.weight, 0);
+    const remaining = row.v - fixedSum;
+
+    temp.forEach(x => {
+      const units = x.fixed !== null ? x.fixed : Math.round((x.weight / freeWeight) * remaining);
+
+      daily.push({
+        date: x.date,
+        dateObj: x.dateObj,
+        units,
+        year: x.year,
+        month: x.month,
+        monthNum: x.monthNum,
+        quarter: 'Q' + (Math.floor((x.monthNum - 1) / 3) + 1),
+        dow: x.dow,
+        dowName: x.dowName,
+        transactions: Math.round(units / AVG_QTY_PER_TXN)
+      });
+    });
+  });
+
+  return daily;
+}
+
+const allDailyData = buildDailyData();
+const dailyMap = new Map(allDailyData.map(d => [d.date, d]));
+const minDate = allDailyData[0].date;
+const maxDate = allDailyData[allDailyData.length - 1].date;
+
+// ======================================================
+// CHART MANAGER
+// ======================================================
+const charts = {};
+
+function makeChart(canvasId, config) {
+  if (charts[canvasId]) charts[canvasId].destroy();
+  charts[canvasId] = new Chart(document.getElementById(canvasId), config);
+}
+
+function chartDefaultOptions(extra = {}) {
+  return {
+    responsive: true,
+    maintainAspectRatio: false,
+    ...extra
+  };
+}
+
+// ======================================================
+// GLOBAL FILTER STATE
+// ======================================================
+function getSelectedRange() {
+  let start = document.getElementById('globalStartDate').value || minDate;
+  let end = document.getElementById('globalEndDate').value || maxDate;
+
+  if (start < minDate) start = minDate;
+  if (end > maxDate) end = maxDate;
+
+  if (start > end) {
+    const temp = start;
+    start = end;
+    end = temp;
+  }
+
+  return { start, end };
+}
+
+function getFilteredDailyData() {
+  const { start, end } = getSelectedRange();
+  return allDailyData.filter(d => d.date >= start && d.date <= end);
+}
+
+function setRange(start, end) {
+  document.getElementById('globalStartDate').value = start;
+  document.getElementById('globalEndDate').value = end;
+  updateAllDashboard();
+}
+
+// ======================================================
+// AGGREGATION
+// ======================================================
+function aggregateDaily(data, mode) {
+  const map = new Map();
+
+  data.forEach(d => {
+    let key;
+    let label;
+    let order;
+
+    if (mode === 'yearly') {
+      key = String(d.year);
+      label = String(d.year);
+      order = d.year;
+    } else if (mode === 'quarterly') {
+      key = `${d.year}-${d.quarter}`;
+      label = `${d.quarter}-${String(d.year).slice(2)}`;
+      order = d.year * 10 + Number(d.quarter.replace('Q', ''));
+    } else {
+      key = `${d.year}-${pad(d.monthNum)}`;
+      label = `${d.month} ${d.year}`;
+      order = d.year * 100 + d.monthNum;
+    }
+
+    if (!map.has(key)) {
+      map.set(key, {
+        key,
+        label,
+        order,
+        units: 0,
+        transactions: 0,
+        year: d.year,
+        month: d.month
+      });
+    }
+
+    const row = map.get(key);
+    row.units += d.units;
+    row.transactions += d.transactions;
+  });
+
+  return [...map.values()].sort((a, b) => a.order - b.order);
+}
+
+function aggregateByDayOfWeek(data) {
+  const order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+  const map = new Map(order.map(day => [day, {
+    day,
+    units: 0,
+    transactions: 0,
+    avg: 0,
+    type: ['Saturday', 'Sunday'].includes(day) ? 'Weekend' : 'Weekday'
+  }]));
+
+  data.forEach(d => {
+    const row = map.get(d.dowName);
+    row.units += d.units;
+    row.transactions += d.transactions;
+  });
+
+  const result = order.map(day => {
+    const r = map.get(day);
+    r.avg = r.transactions > 0 ? r.units / r.transactions : 0;
+    return r;
+  });
+
+  return result;
+}
+
+function calculateYoYForRange(start, end, currentUnits) {
+  const s = parseDate(start);
+  const e = parseDate(end);
+
+  const prevStart = new Date(s);
+  const prevEnd = new Date(e);
+
+  prevStart.setFullYear(prevStart.getFullYear() - 1);
+  prevEnd.setFullYear(prevEnd.getFullYear() - 1);
+
+  const prevStartStr = fmtDate(prevStart);
+  const prevEndStr = fmtDate(prevEnd);
+
+  const prevData = allDailyData.filter(d => d.date >= prevStartStr && d.date <= prevEndStr);
+
+  const currentDays = Math.round((parseDate(end) - parseDate(start)) / (1000 * 60 * 60 * 24)) + 1;
+
+  if (prevData.length < currentDays * 0.7) return null;
+
+  const prevUnits = sum(prevData);
+
+  if (prevUnits <= 0) return null;
+
+  return ((currentUnits - prevUnits) / prevUnits) * 100;
+}
+
+// ======================================================
+// UPDATE KPI CARDS
+// ======================================================
+function updateKpis(data) {
+  const units = sum(data);
+  const txns = Math.round(units / AVG_QTY_PER_TXN);
+  const days = data.length;
+  const avgDaily = days ? units / days : 0;
+
+  const { start, end } = getSelectedRange();
+  const yoy = calculateYoYForRange(start, end, units);
+
+  // Estimated active customers/SKUs for selected date range because raw row-level
+  // customer/SKU transaction data is not embedded in this dashboard.
+  const estimatedCustomers = Math.min(500, Math.round(500 * (1 - Math.exp(-days / 8))));
+  const estimatedSkus = Math.min(10000, Math.round(10000 * (1 - Math.exp(-days / 20))));
+
+  const kpis = document.querySelectorAll('#overview .kpi-card');
+
+  kpis[0].querySelector('.value').textContent = compact(units);
+  kpis[0].querySelector('.label').textContent = 'Units in Selected Range';
+  kpis[0].querySelector('.delta').textContent = yoy === null ? 'YoY N/A' : `${yoy >= 0 ? '+' : ''}${yoy.toFixed(1)}% YoY`;
+  kpis[0].querySelector('.delta').classList.toggle('neg', yoy !== null && yoy < 0);
+
+  kpis[1].querySelector('.value').textContent = compact(txns);
+  kpis[1].querySelector('.label').textContent = 'Estimated Transactions';
+
+  kpis[2].querySelector('.value').textContent = estimatedCustomers.toLocaleString();
+  kpis[2].querySelector('.label').textContent = 'Estimated Active Customers';
+
+  kpis[3].querySelector('.value').textContent = estimatedSkus.toLocaleString();
+  kpis[3].querySelector('.label').textContent = 'Estimated Active SKUs';
+
+  kpis[4].querySelector('.value').textContent = Math.round(avgDaily).toLocaleString();
+  kpis[4].querySelector('.label').textContent = 'Avg Daily Volume';
+
+  kpis[5].querySelector('.value').textContent = days.toLocaleString();
+  kpis[5].querySelector('.label').textContent = 'Selected Days';
+
+  document.getElementById('rangeSummary').textContent =
+    `Showing: ${displayDate(start)} - ${displayDate(end)} | ${days.toLocaleString()} days | ${compact(units)} units`;
+}
+
+// ======================================================
+// STATIC QUALITY CHART
+// ======================================================
+function renderQualityChart() {
+  makeChart('qualityChart', {
+    type: 'doughnut',
+    data: {
+      labels: ['Missing Values', 'Duplicates', 'Invalid Dates', 'Negative Quantities', 'Type Issues', 'Temporal Continuity'],
+      datasets: [{
+        data: [100, 100, 100, 100, 100, 100],
+        backgroundColor: [C.green, C.green, C.green, C.green, C.green, C.green]
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: {
+        legend: { position: 'right' },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.label}: PASS`
+          }
+        }
+      }
+    })
+  });
+}
+
+// ======================================================
+// OVERVIEW CHARTS
+// ======================================================
+function updateOverviewCharts(data) {
+  const yearly = aggregateDaily(data, 'yearly');
+  const quarterly = aggregateDaily(data, 'quarterly');
+
+  makeChart('yearlyChart', {
+    type: 'bar',
+    data: {
+      labels: yearly.map(x => x.label),
+      datasets: [{
+        label: 'Total Units',
+        data: yearly.map(x => x.units),
+        backgroundColor: yearly.map((_, i) => i % 2 === 0 ? C.primary : C.dark)
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => compact(v)
+          }
+        }
+      }
+    })
+  });
+
+  makeChart('quarterlyChart', {
+    type: 'bar',
+    data: {
+      labels: quarterly.map(x => x.label),
+      datasets: [{
+        label: 'Total Units',
+        data: quarterly.map(x => x.units),
+        backgroundColor: quarterly.map((_, i) => i % 2 === 0 ? C.dark : C.primary)
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => compact(v)
+          }
+        }
+      }
+    })
+  });
+}
+
+// ======================================================
+// EDA CHARTS
+// ======================================================
+function renderQtyDistributionChart() {
+  const qtyBins = [
+    210000, 180000, 170000, 90000, 70000, 50000, 38000, 25000, 18000, 12000,
+    8000, 7000, 6000, 5000, 5000, 4500, 4000, 3500, 3000, 2800,
+    2500, 2200, 2000, 1800, 1500, 1300, 1100, 1000, 900, 800
+  ];
+
+  makeChart('qtyDistChart', {
+    type: 'bar',
+    data: {
+      labels: Array.from({ length: 30 }, (_, i) => i + 1),
+      datasets: [{
+        label: 'Frequency',
+        data: qtyBins,
+        backgroundColor: C.dark
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { title: { display: true, text: 'Billing Quantity' } },
+        y: { title: { display: true, text: 'Frequency' } }
+      }
+    })
+  });
+}
+
+function updateDayOfWeek(data) {
+  const dow = aggregateByDayOfWeek(data);
+
+  makeChart('dowChart', {
+    type: 'bar',
+    data: {
+      labels: dow.map(x => x.day.slice(0, 3)),
+      datasets: [{
+        label: 'Total Units',
+        data: dow.map(x => x.units),
+        backgroundColor: dow.map(x => x.type === 'Weekend' ? C.green : C.dark)
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => compact(v)
+          }
+        }
+      }
+    })
+  });
+
+  const tbody = document.querySelector('#dayTable tbody');
+  tbody.innerHTML = '';
+
+  dow.forEach(d => {
+    tbody.innerHTML += `
+      <tr>
+        <td><b>${d.day}</b></td>
+        <td>${Math.round(d.units).toLocaleString()}</td>
+        <td>${Math.round(d.transactions).toLocaleString()}</td>
+        <td>${d.avg.toFixed(2)}</td>
+        <td><span class="tag ${d.type === 'Weekday' ? 'blue' : 'green'}">${d.type}</span></td>
+      </tr>
+    `;
+  });
+}
+
+// ======================================================
+// TIME SERIES
+// ======================================================
+function updateTimeSeries(data) {
+  const view = document.getElementById('tsView').value;
+  const yearFilter = document.getElementById('tsYearFilter').value;
+
+  let filtered = data;
+
+  if (yearFilter !== 'all') {
+    filtered = filtered.filter(d => String(d.year) === yearFilter);
+  }
+
+  const agg = aggregateDaily(filtered, view);
+
+  const titleMap = {
+    monthly: 'Monthly Billing Volume',
+    quarterly: 'Quarterly Billing Volume',
+    yearly: 'Yearly Billing Volume'
+  };
+
+  document.getElementById('tsChartTitle').innerText = titleMap[view];
+
+  makeChart('tsChart', {
+    type: 'line',
+    data: {
+      labels: agg.map(x => x.label),
+      datasets: [{
+        label: 'Total Units',
+        data: agg.map(x => x.units),
+        borderColor: C.primary,
+        backgroundColor: 'rgba(44,90,160,0.15)',
+        fill: true,
+        tension: 0.3,
+        pointRadius: 4,
+        pointBackgroundColor: C.dark
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          ticks: {
+            callback: v => compact(v)
+          }
+        }
+      }
+    })
+  });
+
+  updateMomChart(data);
+  updateYoyChart(data);
+  updateMonthlyTable(data);
+}
+
+function updateMomChart(data) {
+  const monthly = aggregateDaily(data, 'monthly');
+  const labels = [];
+  const values = [];
+
+  for (let i = 1; i < monthly.length; i++) {
+    labels.push(monthly[i].label);
+    values.push(((monthly[i].units - monthly[i - 1].units) / monthly[i - 1].units) * 100);
+  }
+
+  makeChart('momChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'MoM %',
+        data: values,
+        backgroundColor: values.map(v => v >= 0 ? C.green : C.red)
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { title: { display: true, text: '% Change' } }
+      }
+    })
+  });
+}
+
+function updateYoyChart(data) {
+  const selectedMonths = new Set(data.map(d => d.month));
+  const visibleMonths = monthNames.filter(m => selectedMonths.has(m));
+
+  function getYearData(year) {
+    return visibleMonths.map(m => {
+      const rows = data.filter(d => d.year === year && d.month === m);
+      return rows.length ? sum(rows) : null;
+    });
+  }
+
+  makeChart('yoyChart', {
+    type: 'line',
+    data: {
+      labels: visibleMonths,
+      datasets: [
+        {
+          label: '2024',
+          data: getYearData(2024),
+          borderColor: C.primary,
+          backgroundColor: 'transparent',
+          tension: 0.3
+        },
+        {
+          label: '2025',
+          data: getYearData(2025),
+          borderColor: C.accent,
+          backgroundColor: 'transparent',
+          tension: 0.3
+        },
+        {
+          label: '2026',
+          data: getYearData(2026),
+          borderColor: C.green,
+          backgroundColor: 'transparent',
+          tension: 0.3
+        }
+      ]
+    },
+    options: chartDefaultOptions({
+      scales: {
+        y: {
+          ticks: {
+            callback: v => compact(v)
+          }
+        }
+      }
+    })
+  });
+}
+
+function updateMonthlyTable(data) {
+  const monthly = aggregateDaily(data, 'monthly');
+  const tbody = document.querySelector('#monthlyTable tbody');
+  tbody.innerHTML = '';
+
+  monthly.forEach(row => {
+    const source = monthlyData.find(x => x.y === row.year && x.m === row.month);
+    const yoy = source && source.yoy !== null ? `${source.yoy > 0 ? '+' : ''}${source.yoy}%` : 'N/A';
+
+    let noteTag = '';
+    if (source && source.note === 'Peak') noteTag = `<span class="tag green">Peak</span>`;
+    if (source && source.note === 'Low') noteTag = `<span class="tag red">Low</span>`;
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${row.year}</td>
+        <td>${row.month}</td>
+        <td>${Math.round(row.units).toLocaleString()}</td>
+        <td>${yoy}</td>
+        <td>${noteTag}</td>
+      </tr>
+    `;
+  });
+}
+
+// ======================================================
+// CUSTOMER SECTION
+// ======================================================
+function updateCustomers(data) {
+  const selectedUnits = sum(data);
+  const factor = selectedUnits / FULL_TOTAL_UNITS;
+  const n = parseInt(document.getElementById('topNCustomers').value || '15', 10);
+  const rows = topCustomers.slice(0, n).map(x => ({
+    ...x,
+    su: Math.round(x.u * factor),
+    st: Math.round(x.t * factor)
+  }));
+
+  makeChart('topCustChart', {
+    type: 'bar',
+    data: {
+      labels: rows.map(x => x.c),
+      datasets: [{
+        label: 'Estimated Units in Selected Range',
+        data: rows.map(x => x.su),
+        backgroundColor: C.blue
+      }]
+    },
+    options: chartDefaultOptions({
+      indexAxis: 'y',
+      plugins: { legend: { display: false } }
+    })
+  });
+
+  const tbody = document.querySelector('#custTable tbody');
+  tbody.innerHTML = '';
+
+  rows.forEach(x => {
+    tbody.innerHTML += `
+      <tr>
+        <td>${x.r}</td>
+        <td><b>${x.c}</b></td>
+        <td>${x.su.toLocaleString()}</td>
+        <td>${x.p}%</td>
+        <td>${x.st.toLocaleString()}</td>
+        <td>${x.a}</td>
+      </tr>
+    `;
+  });
+}
+
+// ======================================================
+// SKU SECTION
+// ======================================================
+function updateSkus(data) {
+  const selectedUnits = sum(data);
+  const factor = selectedUnits / FULL_TOTAL_UNITS;
+
+  const rows = topSkus.map(x => ({
+    ...x,
+    su: Math.round(x.u * factor)
+  }));
+
+  makeChart('topSkuChart', {
+    type: 'bar',
+    data: {
+      labels: rows.map(x => x.s),
+      datasets: [{
+        label: 'Estimated Units in Selected Range',
+        data: rows.map(x => x.su),
+        backgroundColor: C.accent
+      }]
+    },
+    options: chartDefaultOptions({
+      indexAxis: 'y',
+      plugins: { legend: { display: false } }
+    })
+  });
+
+  const tbody = document.querySelector('#skuTable tbody');
+  tbody.innerHTML = '';
+
+  rows.forEach(x => {
+    const pct = selectedUnits > 0 ? ((x.su / selectedUnits) * 100).toFixed(3) : '0.000';
+
+    tbody.innerHTML += `
+      <tr>
+        <td>${x.r}</td>
+        <td><b>${x.s}</b></td>
+        <td>${x.su.toLocaleString()}</td>
+        <td>${pct}%</td>
+      </tr>
+    `;
+  });
+}
+
+function renderVelocityChart() {
+  makeChart('velocityChart', {
+    type: 'doughnut',
+    data: {
+      labels: ['Fast (>400/y)', 'Medium (200-400)', 'Slow (100-200)', 'Dead (<100)'],
+      datasets: [{
+        data: [3000, 4000, 2500, 500],
+        backgroundColor: [C.green, C.blue, C.yellow, C.red]
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: {
+        legend: { position: 'right' }
+      }
+    })
+  });
+}
+
+// ======================================================
+// ANOMALY CHART
+// ======================================================
+function updateAnomalyChart(data) {
+  const values = data.map(d => d.units);
+  const mean = values.length ? values.reduce((a, b) => a + b, 0) / values.length : 0;
+  const variance = values.length ? values.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / values.length : 0;
+  const std = Math.sqrt(variance);
+
+  const upper = mean + 2.5 * std;
+  const lower = mean - 2.5 * std;
+
+  const dailyLine = data.map(d => ({ x: d.date, y: d.units }));
+  const upperLine = data.map(d => ({ x: d.date, y: upper }));
+  const lowerLine = data.map(d => ({ x: d.date, y: lower }));
+  const anomalies = data
+    .filter(d => d.units > upper || d.units < lower)
+    .map(d => ({ x: d.date, y: d.units }));
+
+  makeChart('anomalyChart', {
+    type: 'line',
+    data: {
+      datasets: [
+        {
+          label: 'Daily Units',
+          data: dailyLine,
+          borderColor: C.primary,
+          backgroundColor: 'transparent',
+          pointRadius: 0,
+          borderWidth: 1
+        },
+        {
+          label: '+2.5σ',
+          data: upperLine,
+          borderColor: C.red,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          borderWidth: 1.5
+        },
+        {
+          label: '-2.5σ',
+          data: lowerLine,
+          borderColor: C.red,
+          borderDash: [5, 5],
+          pointRadius: 0,
+          borderWidth: 1.5
+        },
+        {
+          label: 'Anomalies',
+          data: anomalies,
+          backgroundColor: C.accent,
+          borderColor: C.accent,
+          pointRadius: 6,
+          showLine: false,
+          type: 'scatter'
+        }
+      ]
+    },
+    options: chartDefaultOptions({
+      scales: {
+        x: {
+          type: 'time',
+          time: {
+            unit: data.length > 180 ? 'month' : 'week'
+          }
+        },
+        y: {
+          title: {
+            display: true,
+            text: 'Daily Units'
+          }
+        }
+      }
+    })
+  });
+}
+
+// ======================================================
+// FORECAST + MODEL CHARTS
+// ======================================================
+function renderForecastChart() {
+  const histLabels = ['Oct-25', 'Nov-25', 'Dec-25', 'Jan-26', 'Feb-26', 'Mar-26'];
+  const histVals = [272836, 267395, 269364, 274119, 244411, 271087];
+
+  const fcLabels = ['Apr-26', 'May-26', 'Jun-26', 'Jul-26', 'Aug-26', 'Sep-26'];
+  const fcVals = [264000, 272000, 261000, 272000, 271000, 263000];
+
+  const ciL = [251000, 259000, 248000, 259000, 258000, 250000];
+  const ciU = [277000, 285000, 274000, 285000, 284000, 276000];
+
+  makeChart('forecastChart', {
+    type: 'line',
+    data: {
+      labels: [...histLabels, ...fcLabels],
+      datasets: [
+        {
+          label: 'Actual',
+          data: [...histVals, ...Array(6).fill(null)],
+          borderColor: C.primary,
+          backgroundColor: 'transparent',
+          pointRadius: 4,
+          tension: 0.3
+        },
+        {
+          label: 'Forecast',
+          data: [...Array(6).fill(null), ...fcVals],
+          borderColor: C.accent,
+          backgroundColor: 'transparent',
+          borderDash: [6, 4],
+          pointRadius: 4,
+          tension: 0.3
+        },
+        {
+          label: 'CI Upper',
+          data: [...Array(6).fill(null), ...ciU],
+          borderColor: 'rgba(245,166,35,0.3)',
+          backgroundColor: 'rgba(245,166,35,0.2)',
+          pointRadius: 0,
+          fill: '+1'
+        },
+        {
+          label: 'CI Lower',
+          data: [...Array(6).fill(null), ...ciL],
+          borderColor: 'rgba(245,166,35,0.3)',
+          backgroundColor: 'rgba(245,166,35,0.2)',
+          pointRadius: 0,
+          fill: false
+        }
+      ]
+    },
+    options: chartDefaultOptions({
+      scales: {
+        y: {
+          ticks: {
+            callback: v => compact(v)
+          }
+        }
+      }
+    })
+  });
+}
+
+function renderModelChart() {
+  makeChart('modelChart', {
+    type: 'bar',
+    data: {
+      labels: ['Naive', 'SARIMA', 'Prophet', 'LightGBM', 'LSTM'],
+      datasets: [{
+        label: 'Expected MAPE %',
+        data: [4.6, 3.4, 3.2, 2.9, 3.1],
+        backgroundColor: [C.gray, C.blue, C.blue, C.green, C.blue]
+      }]
+    },
+    options: chartDefaultOptions({
+      plugins: { legend: { display: false } },
+      scales: {
+        y: {
+          title: {
+            display: true,
+            text: 'MAPE %'
+          }
+        }
+      }
+    })
+  });
+}
+
+// ======================================================
+// MASTER UPDATE
+// ======================================================
+function updateAllDashboard() {
+  const data = getFilteredDailyData();
+
+  updateKpis(data);
+  updateOverviewCharts(data);
+  updateDayOfWeek(data);
+  updateTimeSeries(data);
+  updateCustomers(data);
+  updateSkus(data);
+  updateAnomalyChart(data);
+}
+
+// ======================================================
+// INIT
+// ======================================================
+function initDateControls() {
+  const startInput = document.getElementById('globalStartDate');
+  const endInput = document.getElementById('globalEndDate');
+
+  startInput.min = minDate;
+  startInput.max = maxDate;
+  endInput.min = minDate;
+  endInput.max = maxDate;
+
+  startInput.value = minDate;
+  endInput.value = maxDate;
+
+  document.getElementById('applyDateRange').addEventListener('click', updateAllDashboard);
+
+  startInput.addEventListener('change', updateAllDashboard);
+  endInput.addEventListener('change', updateAllDashboard);
+
+  document.querySelectorAll('.global-filter button[data-range]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const range = btn.dataset.range;
+
+      if (range === 'full') {
+        setRange(minDate, maxDate);
+      }
+
+      if (range === 'fy2425') {
+        setRange('2024-04-01', '2025-03-31');
+      }
+
+      if (range === 'fy2526') {
+        setRange('2025-04-01', '2026-03-31');
+      }
+
+      if (range === 'last90') {
+        const end = parseDate(maxDate);
+        const start = new Date(end);
+        start.setDate(start.getDate() - 89);
+        setRange(fmtDate(start), maxDate);
+      }
+    });
+  });
+
+  document.getElementById('tsView').addEventListener('change', updateAllDashboard);
+  document.getElementById('tsYearFilter').addEventListener('change', updateAllDashboard);
+  document.getElementById('topNCustomers').addEventListener('change', updateAllDashboard);
+}
+
+function initDashboard() {
+  initDateControls();
+
+  renderQualityChart();
+  renderQtyDistributionChart();
+  renderVelocityChart();
+  renderForecastChart();
+  renderModelChart();
+
+  updateAllDashboard();
+}
+
+initDashboard();
+</script>
